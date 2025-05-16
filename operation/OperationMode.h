@@ -1,3 +1,18 @@
+/*
+ _______________________________________
+/ The best way to success is failing in \
+\ the attempt                           /
+ ---------------------------------------
+   \
+    \  .——————.
+      .———.    \
+     (     )   +——\
+      `———´    |  |
+      |        |  |
+      |   __   +——/
+      \__/  \__/
+*/
+
 #ifndef OPERATIONMODE_H
 #define OPERATIONMODE_H
 

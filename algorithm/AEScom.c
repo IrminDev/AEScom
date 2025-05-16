@@ -1,3 +1,18 @@
+/*
+ _______________________________________
+/ The best way to success is failing in \
+\ the attempt                           /
+ ---------------------------------------
+   \
+    \  .——————.
+      .———.    \
+     (     )   +——\
+      `———´    |  |
+      |        |  |
+      |   __   +——/
+      \__/  \__/
+*/
+
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>

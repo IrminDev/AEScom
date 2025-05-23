@@ -14,11 +14,104 @@
 */
 
 #include <stdio.h>
+#include <stdint.h>
 #include <stdlib.h>
 #include <string.h>
 #include "operation/OperationMode.h"
 
 typedef unsigned char byte;
+
+// Find the position of a character in the base64_chars table
+static int base64_char_value(char c) {
+    if (c >= 'A' && c <= 'Z') return c - 'A';
+    if (c >= 'a' && c <= 'z') return c - 'a' + 26;
+    if (c >= '0' && c <= '9') return c - '0' + 52;
+    if (c == '+') return 62;
+    if (c == '/') return 63;
+    return -1; // Invalid character
+}
+
+// Decode Base64 string to binary data
+byte* base64_decode(const char *data, size_t *output_length) {
+    if (data == NULL) return NULL;
+    
+    size_t input_length = strlen(data);
+    if (input_length == 0) {
+        *output_length = 0;
+        return NULL;
+    }
+    
+    // Count padding characters ('=')
+    size_t padding = 0;
+    if (input_length >= 1 && data[input_length - 1] == '=') padding++;
+    if (input_length >= 2 && data[input_length - 2] == '=') padding++;
+    
+    // Calculate output size
+    *output_length = (input_length / 4) * 3 - padding;
+    
+    byte *decoded_data = malloc(*output_length);
+    if (decoded_data == NULL) return NULL;
+    
+    size_t i, j = 0;
+    uint32_t sextet_a, sextet_b, sextet_c, sextet_d;
+    uint32_t triple;
+    
+    for (i = 0; i < input_length; i += 4) {
+        // Get values for each group of four base 64 characters
+        sextet_a = data[i] == '=' ? 0 & i+0 : base64_char_value(data[i+0]);
+        sextet_b = data[i+1] == '=' ? 0 & i+1 : base64_char_value(data[i+1]);
+        sextet_c = data[i+2] == '=' ? 0 & i+2 : base64_char_value(data[i+2]);
+        sextet_d = data[i+3] == '=' ? 0 & i+3 : base64_char_value(data[i+3]);
+        
+        // Check for invalid characters
+        if (sextet_a == -1 || sextet_b == -1 || sextet_c == -1 || sextet_d == -1) {
+            free(decoded_data);
+            *output_length = 0;
+            return NULL;
+        }
+        
+        triple = (sextet_a << 18) + (sextet_b << 12) + (sextet_c << 6) + sextet_d;
+        
+        if (j < *output_length) decoded_data[j++] = (triple >> 16) & 0xFF;
+        if (j < *output_length) decoded_data[j++] = (triple >> 8) & 0xFF;
+        if (j < *output_length) decoded_data[j++] = triple & 0xFF;
+    }
+    
+    return decoded_data;
+}
+
+// Base64 encoding table
+static const char base64_chars[] = 
+    "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
+
+// Encode binary data to Base64 string
+char* base64_encode(const unsigned char *data, size_t input_length) {
+    size_t output_length = 4 * ((input_length + 2) / 3);
+    char *encoded_data = malloc(output_length + 1);
+    if (encoded_data == NULL) return NULL;
+
+    size_t i, j;
+    for (i = 0, j = 0; i < input_length;) {
+        uint32_t octet_a = i < input_length ? data[i++] : 0;
+        uint32_t octet_b = i < input_length ? data[i++] : 0;
+        uint32_t octet_c = i < input_length ? data[i++] : 0;
+
+        uint32_t triple = (octet_a << 16) + (octet_b << 8) + octet_c;
+
+        encoded_data[j++] = base64_chars[(triple >> 18) & 0x3F];
+        encoded_data[j++] = base64_chars[(triple >> 12) & 0x3F];
+        encoded_data[j++] = base64_chars[(triple >> 6) & 0x3F];
+        encoded_data[j++] = base64_chars[triple & 0x3F];
+    }
+
+    // Add padding characters if needed
+    for (i = 0; i < (3 - input_length % 3) % 3; i++) {
+        encoded_data[output_length - 1 - i] = '=';
+    }
+
+    encoded_data[output_length] = '\0';
+    return encoded_data;
+}
 
 byte* encrypt_data(byte* input, byte key, char* mode) {
     printf("Input 1: %s\n", input);
@@ -106,9 +199,7 @@ int main(int argc, char *argv[]) {
     
     printf("Input: %s\n", input);
     printf("Encrypted: ");
-    for(size_t i = 0; i < input_len; i++) {
-        printf("%02X ", encrypted[i]);
-    }
+    printf(base64_encode(encrypted, input_len));
     printf("\n");
 
     printf("Decrypted: %s\n", decrypted);

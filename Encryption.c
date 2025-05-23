@@ -114,7 +114,6 @@ char* base64_encode(const unsigned char *data, size_t input_length) {
 }
 
 byte* encrypt_data(byte* input, byte key, char* mode) {
-    printf("Input 1: %s\n", input);
     byte* output = (byte*)malloc(strlen((char*)input) + 1);
     if (output == NULL) {
         fprintf(stderr, "Memory allocation failed\n");
@@ -162,51 +161,78 @@ byte* decrypt_data(byte* input, byte key, char* mode) {
 
 int main(int argc, char *argv[]) {
     if (argc < 4) {
-        fprintf(stderr, "Usage: %s <input_string> <key> <mode>\n", argv[0]);
+        fprintf(stderr, "Usage: %s <operation> <input_string> <key> <mode>\n", argv[0]);
+        fprintf(stderr, "operation: -e or -d\n");
+        return 1;
+    }
+
+    char* operation = argv[1];
+    int operation_type = 0;
+    if (strcmp(operation, "-e") == 0) {
+        operation_type = 0;
+    } else if (strcmp(operation, "-d") == 0) {
+        operation_type = 1;
+    } else {
+        fprintf(stderr, "Invalid operation: %s\n", operation);
         return 1;
     }
 
     // Get the input string directly without conversion
-    byte* input = (byte*)strdup(argv[1]);  // Make a copy to avoid modifying argv
+    byte* input = (byte*)strdup(argv[2]);  // Make a copy to avoid modifying argv
     if (!input) {
         fprintf(stderr, "Memory allocation failed\n");
         return 1;
     }
     
-        // Convert key from hex string to byte
-    byte key = (byte)strtol(argv[2], NULL, 16);
+    // Convert key from hex string to byte
+    byte key = (byte)strtol(argv[3], NULL, 16);
 
-    char* mode = argv[3];
+    char* mode = argv[4];
 
-    // Encrypt the input
-    byte* encrypted = encrypt_data(input, key, mode);
-    if (!encrypted) {
-        fprintf(stderr, "Encryption failed\n");
-        free(input);
-        return 1;
-    }
+    if(operation_type){
+        size_t decoded_length = strlen((char*)input);
+        byte* decoded_input = base64_decode((char*)input, &decoded_length);
+        if (!decoded_input) {
+            fprintf(stderr, "Base64 decoding failed\n");
+            free(input);
+            return 1;
+        }
 
-    // Decrypt the encrypted data
-    byte* decrypted = decrypt_data(encrypted, key, mode);
-    if (!decrypted) {
-        fprintf(stderr, "Decryption failed\n");
-        free(input);
+        // Decrypt the input data
+        byte* decrypted = decrypt_data(decoded_input, key, mode);
+        if (!decrypted) {
+            fprintf(stderr, "Decryption failed\n");
+            free(input);
+            free(decoded_input);
+            return 1;
+        }
+
+        printf("Input: %s\n", input);
+        printf("Decrypted: %s\n", decrypted);
+
+        free(decoded_input);
+        free(decrypted);
+
+        return 0;
+    } else {
+        // Encrypt the input data
+        byte* encrypted = encrypt_data(input, key, mode);
+        if (!encrypted) {
+            fprintf(stderr, "Encryption failed\n");
+            free(input);
+            return 1;
+        }
+
+        size_t input_len = strlen((char*)input);
+
+        printf("Input: %s\n", input);
+        printf("Encrypted: ");
+        printf(base64_encode(encrypted, input_len));
+        printf("\n");
+
         free(encrypted);
-        return 1;
+        free(input);
+
+        return 0;
     }
-
-    size_t input_len = strlen((char*)input);
-    
-    printf("Input: %s\n", input);
-    printf("Encrypted: ");
-    printf(base64_encode(encrypted, input_len));
-    printf("\n");
-
-    printf("Decrypted: %s\n", decrypted);
-
-    free(input);
-    free(encrypted);
-    free(decrypted);
-
-    return 0;
 }

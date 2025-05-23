@@ -93,20 +93,16 @@ byte key_schedule(byte key, int round) {
 
 byte encrypt_block(byte input, byte key) {
     byte output = input;
-    printf("Input: 0x%02X\n", input);
     for (int i = 0; i < 4; i++) {
         output = spn_network(output, key_schedule(key, i));
-        printf("Round %d: 0x%02X, key: %02X, i: %d\n", i, output, key_schedule(key, i), i);
     }
     return output;
 }
 
 byte decrypt_block(byte input, byte key) {
     byte output = input;
-    printf("Input: 0x%02X\n", input);
     for (int i = 3; i >= 0; i--) {
         output = inverse_spn_network(output, key_schedule(key, i));
-        printf("Round %d: 0x%02X, key: %02X, i: %d\n", i, output, key_schedule(key, i), i);
     }
     return output;
 }

@@ -16,6 +16,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <time.h>
 #include "../algorithm/AEScom.h"
 #include "OperationMode.h"
 
@@ -29,7 +30,10 @@ byte counter_mode_encrypt_operation(byte input, byte cnt, byte key){
 
 byte* counter_mode_encrypt(byte* input, byte key){
     // Read the last byte to get the counter value
-    byte cnt = 0;
+    // Generate a new seed for the random number generator
+    srand((unsigned int)time(NULL));
+    byte cnt = (byte)(rand() % 256); // Random counter value
+
     byte* output = (byte*)malloc(strlen((char*)input) + 2);
     if (output == NULL) {
         fprintf(stderr, "Memory allocation failed\n");
@@ -42,6 +46,8 @@ byte* counter_mode_encrypt(byte* input, byte key){
     }
 
     output[strlen((char*)input)] = cnt;
+
+    printf("Counter value: %d\n", cnt);
     output[strlen((char*)input) + 1] = '\0';
 
     return output;
@@ -59,16 +65,19 @@ byte* counter_mode_decrypt(byte* input, byte key) {
         return NULL;
     }
     
-    byte cnt = input[len-1];
+    // Get the counter value from the last byte
+    byte start_counter = input[len-1];
+    printf("Counter value: %d\n", start_counter);
     
-    byte* output = (byte*)malloc(len); // This includes null terminator space
+    byte* output = (byte*)malloc(len);
     if (output == NULL) {
         fprintf(stderr, "Memory allocation failed\n");
         return NULL;
     }
     
-    byte counter = 0;
-    for (size_t i = 0; i < len - 1; i++) { // -1 to exclude counter byte
+    // Use the same starting counter as encryption
+    byte counter = start_counter - (len - 1);
+    for (size_t i = 0; i < len - 1; i++) {
         output[i] = counter_mode_encrypt_operation(input[i], counter, key);
         counter++;
     }

@@ -190,13 +190,33 @@ int main(int argc, char *argv[]) {
     char* mode = argv[4];
 
     if(operation_type){
-        size_t decoded_length = strlen((char*)input);
+        size_t decoded_length;
         byte* decoded_input = base64_decode((char*)input, &decoded_length);
         if (!decoded_input) {
             fprintf(stderr, "Base64 decoding failed\n");
             free(input);
             return 1;
         }
+        
+        // Ensure the decoded data is properly null-terminated for CTR mode
+        if (strcmp(mode, "CTR") == 0) {
+            // We need to add a null terminator after the counter byte
+            byte* temp = realloc(decoded_input, decoded_length + 1);
+            if (!temp) {
+                fprintf(stderr, "Memory reallocation failed\n");
+                free(decoded_input);
+                free(input);
+                return 1;
+            }
+            decoded_input = temp;
+            decoded_input[decoded_length] = '\0';
+        }
+
+        printf("Decoded input: ");
+        for (size_t i = 0; i < decoded_length; i++) {
+            printf("%02x ", decoded_input[i]);
+        }
+        printf("\n");
 
         // Decrypt the input data
         byte* decrypted = decrypt_data(decoded_input, key, mode);
@@ -215,7 +235,7 @@ int main(int argc, char *argv[]) {
 
         return 0;
     } else {
-        // Encrypt the input data
+        // In the encryption branch
         byte* encrypted = encrypt_data(input, key, mode);
         if (!encrypted) {
             fprintf(stderr, "Encryption failed\n");
@@ -224,15 +244,24 @@ int main(int argc, char *argv[]) {
         }
 
         size_t input_len = strlen((char*)input);
+        size_t encrypted_len = input_len;
+
+        // For CTR mode, we need to include the counter byte in the Base64 encoding
+        if (strcmp(mode, "CTR") == 0) {
+            encrypted_len = input_len + 1; // Include counter byte
+        }
 
         printf("Input: %s\n", input);
         printf("Encrypted: ");
-        printf(base64_encode(encrypted, input_len));
+        char* b64 = base64_encode(encrypted, encrypted_len);
+        printf("%s", b64);
+        free(b64);
         printf("\n");
 
-        free(encrypted);
-        free(input);
-
-        return 0;
+        printf("Hex: ");
+        for(int i = 0; i < encrypted_len; i++) {
+            printf("%02x ", encrypted[i]);
+        }
+        printf("\n");
     }
 }

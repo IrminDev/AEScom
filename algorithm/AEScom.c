@@ -87,7 +87,7 @@ byte inverse_spn_network(byte input, byte key) {
     return (left << 4) | right;
 }
 
-byte key_schedule(byte key, int round) {
+byte key_schedule(byte key, int round) { // Input (n bits key) Output (4 bits key)
     return (key ^ (round * 0x1B)) & 0x0F;
 }
 

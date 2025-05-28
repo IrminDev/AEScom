@@ -125,7 +125,6 @@ byte* encrypt_data(byte* input, byte key, char* mode) {
     } else if(strcmp(mode, "CBC") == 0) {
        byte iv; 
         output = cbc_mode_encrypt(input, key, &iv);
-        printf("Generated IV: %02x\n", iv); 
     } else if(strcmp(mode, "CTR") == 0) {
         output = counter_mode_encrypt(input, key);
     } else {
@@ -200,7 +199,7 @@ int main(int argc, char *argv[]) {
         }
         
         // Ensure the decoded data is properly null-terminated for CTR mode
-        if (strcmp(mode, "CTR") == 0) {
+        if (strcmp(mode, "CTR") == 0 || strcmp(mode, "CBC") == 0) {
             // We need to add a null terminator after the counter byte
             byte* temp = realloc(decoded_input, decoded_length + 1);
             if (!temp) {
@@ -248,7 +247,7 @@ int main(int argc, char *argv[]) {
         size_t encrypted_len = input_len;
 
         // For CTR mode, we need to include the counter byte in the Base64 encoding
-        if (strcmp(mode, "CTR") == 0) {
+        if (strcmp(mode, "CTR") == 0 || strcmp(mode, "CBC") == 0) {
             encrypted_len = input_len + 1; // Include counter byte
         }
 

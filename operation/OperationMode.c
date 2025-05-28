@@ -138,6 +138,11 @@ byte* cbc_mode_encrypt(byte* input, byte key, byte* iv) {
     }
 
     output[len + 2] = '\0'; 
+    printf("Generated IV: %02x\n", *iv);
+    printf("output: ");
+    for (size_t i = 0; i < len + 1; i++) {
+        printf("%02x ", output[i]);
+    }
     return output;
 }
 

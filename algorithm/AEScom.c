@@ -92,8 +92,6 @@ byte key_schedule(byte key, int round) { // Input (n bits key) Output (4 bits ke
 
     byte round_constant = (round * 0x03) & 0x0F; 
     return rotated_key ^ round_constant;
-
-
 }
 
 byte encrypt_block(byte input, byte key) {

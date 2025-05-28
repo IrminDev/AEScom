@@ -120,7 +120,7 @@ byte* ebc_mode_decrypt(byte* input, byte key){
 
 byte* cbc_mode_encrypt(byte* input, byte key, byte* iv) {
     size_t len = strlen((char*)input); 
-    byte* output = (byte*)malloc(len + 2); 
+    byte* output = (byte*)malloc(len + 3); 
     if (output == NULL) {
         fprintf(stderr, "Memory allocation failed\n");
         return NULL;
@@ -137,7 +137,7 @@ byte* cbc_mode_encrypt(byte* input, byte key, byte* iv) {
         previous_block = output[i + 1]; 
     }
 
-    output[len + 1] = '\0'; 
+    output[len + 2] = '\0'; 
     return output;
 }
 

@@ -117,3 +117,46 @@ byte* ebc_mode_decrypt(byte* input, byte key){
 
     return output;
 }
+
+byte* cbc_mode_encrypt(byte* input, byte key, byte* iv) {
+    size_t len = strlen((char*)input); 
+    byte* output = (byte*)malloc(len + 2); 
+    if (output == NULL) {
+        fprintf(stderr, "Memory allocation failed\n");
+        return NULL;
+    }
+
+    srand((unsigned int)time(NULL));
+    *iv = (byte)(rand() % 256); 
+    output[0] = *iv; 
+
+    byte previous_block = *iv; 
+    for (size_t i = 0; i < len; i++) {
+        byte xor_input = input[i] ^ previous_block; 
+        output[i + 1] = encrypt_block(xor_input, key); 
+        previous_block = output[i + 1]; 
+    }
+
+    output[len + 1] = '\0'; 
+    return output;
+}
+
+byte* cbc_mode_decrypt(byte* input, byte key) {
+    size_t len = strlen((char*)input) - 1; 
+    byte* output = (byte*)malloc(len + 1); 
+    if (output == NULL) {
+        fprintf(stderr, "Memory allocation failed\n");
+        return NULL;
+    }
+
+    byte iv = input[0]; 
+    byte previous_block = iv;
+    for (size_t i = 0; i < len; i++) {
+        byte decrypted_block = decrypt_block(input[i + 1], key); 
+        output[i] = decrypted_block ^ previous_block; 
+        previous_block = input[i + 1]; 
+    }
+
+    output[len] = '\0'; 
+    return output;
+}

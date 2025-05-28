@@ -88,7 +88,12 @@ byte inverse_spn_network(byte input, byte key) {
 }
 
 byte key_schedule(byte key, int round) { // Input (n bits key) Output (4 bits key)
-    return (key ^ (round * 0x1B)) & 0x0F;
+ byte rotated_key = ((key << 1) | (key >> 3)) & 0x0F;
+
+    byte round_constant = (round * 0x03) & 0x0F; 
+    return rotated_key ^ round_constant;
+
+
 }
 
 byte encrypt_block(byte input, byte key) {

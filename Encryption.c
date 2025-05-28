@@ -123,8 +123,9 @@ byte* encrypt_data(byte* input, byte key, char* mode) {
     if(strcmp(mode, "ECB") == 0) {
         output = ebc_mode_encrypt(input, key);
     } else if(strcmp(mode, "CBC") == 0) {
-        // CBC mode logic would go here
-        return NULL; // Placeholder for CBC mode
+       byte iv; 
+        output = cbc_mode_encrypt(input, key, &iv);
+        printf("Generated IV: %02x\n", iv); 
     } else if(strcmp(mode, "CTR") == 0) {
         output = counter_mode_encrypt(input, key);
     } else {
@@ -146,8 +147,8 @@ byte* decrypt_data(byte* input, byte key, char* mode) {
     if(strcmp(mode, "ECB") == 0) {
         output = ebc_mode_decrypt(input, key);
     } else if(strcmp(mode, "CBC") == 0) {
-        // CBC mode logic would go here
-        return NULL; // Placeholder for CBC mode
+        output = cbc_mode_decrypt(input, key);
+
     } else if(strcmp(mode, "CTR") == 0) {
         output = counter_mode_decrypt(input, key);
     } else {

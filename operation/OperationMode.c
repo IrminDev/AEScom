@@ -40,7 +40,7 @@ byte* counter_mode_encrypt(byte* input, byte key){
         return NULL;
     }
     
-    for (int i = 0; i < strlen((char*)input); i++) {
+    for (size_t i = 0; i < strlen((char*)input); i++) {
         output[i] = counter_mode_encrypt_operation(input[i], cnt, key);
         cnt++;
     }
@@ -53,68 +53,77 @@ byte* counter_mode_encrypt(byte* input, byte key){
     return output;
 }
 
-byte* counter_mode_decrypt(byte* input, byte key) {
+byte* counter_mode_decrypt(byte* input, byte key, size_t input_len) {
     if (!input) {
         fprintf(stderr, "NULL input in counter_mode_decrypt\n");
         return NULL;
     }
     
-    size_t len = strlen((char*)input);
-    if (len < 1) {
-        fprintf(stderr, "Invalid input length in counter_mode_decrypt\n");
-        return NULL;
-    }
-    
     // Get the counter value from the last byte
-    byte start_counter = input[len-1];
+    byte start_counter = input[input_len-1];
     printf("Counter value: %d\n", start_counter);
     
-    byte* output = (byte*)malloc(len);
+    byte* output = (byte*)malloc(input_len);
     if (output == NULL) {
         fprintf(stderr, "Memory allocation failed\n");
         return NULL;
     }
     
     // Use the same starting counter as encryption
-    byte counter = start_counter - (len - 1);
-    for (size_t i = 0; i < len - 1; i++) {
+    byte counter = start_counter - (input_len - 1);
+    for (size_t i = 0; i < input_len - 1; i++) {
         output[i] = counter_mode_encrypt_operation(input[i], counter, key);
         counter++;
     }
     
-    output[len-1] = '\0'; // Null-terminate
+    output[input_len-1] = '\0'; // Null-terminate
     return output;
 }
 
 byte* ebc_mode_encrypt(byte* input, byte key){
-    byte* output = (byte*)malloc(strlen(input) + 1);
+    size_t input_len = strlen((char*)input);
+    byte* output = (byte*)malloc(input_len + 1);
     if (output == NULL) {
         fprintf(stderr, "Memory allocation failed\n");
         return NULL;
     }
     
-    for (int i = 0; i < strlen(input); i++) {
+    for (size_t i = 0; i < input_len; i++) {
         output[i] = encrypt_block(input[i], key);
     }
 
-    output[strlen(input)] = '\0'; // Null-terminate the string
+    output[input_len] = '\0'; // Null-terminate the string
+
+    // Don't use strlen() on binary data - use the known length
+    printf("Output length: %zu\n", input_len);
+    printf("Output (hex): ");
+    for (size_t i = 0; i < input_len; i++) {
+        printf("%02x ", output[i]);
+    }
+    printf("\n");
 
     return output;
 }
 
-byte* ebc_mode_decrypt(byte* input, byte key){
-    byte* output = (byte*)malloc(strlen(input) + 1);
+byte* ebc_mode_decrypt(byte* input, byte key, size_t input_len) {
+    printf("Input length: %zu\n", input_len);
+    printf("Input (hex): ");
+    for (size_t i = 0; i < input_len; i++) {
+        printf("%02x ", input[i]);
+    }
+    
+    byte* output = (byte*)malloc(input_len + 1);
     if (output == NULL) {
         fprintf(stderr, "Memory allocation failed\n");
         return NULL;
     }
     
-    for (int i = 0; i < strlen(input); i++) {
+    for (size_t i = 0; i < input_len; i++) {
         output[i] = decrypt_block(input[i], key);
     }
 
-    output[strlen(input)] = '\0'; // Null-terminate the string
-
+    output[input_len] = '\0'; // Null-terminate the string
+    
     return output;
 }
 
@@ -138,17 +147,12 @@ byte* cbc_mode_encrypt(byte* input, byte key, byte* iv) {
     }
 
     output[len + 2] = '\0'; 
-    printf("Generated IV: %02x\n", *iv);
-    printf("output: ");
-    for (size_t i = 0; i < len + 1; i++) {
-        printf("%02x ", output[i]);
-    }
+
     return output;
 }
 
-byte* cbc_mode_decrypt(byte* input, byte key) {
-    size_t len = strlen((char*)input) - 1; 
-    byte* output = (byte*)malloc(len + 1); 
+byte* cbc_mode_decrypt(byte* input, byte key, size_t input_len) {
+    byte* output = (byte*)malloc(input_len + 1); 
     if (output == NULL) {
         fprintf(stderr, "Memory allocation failed\n");
         return NULL;
@@ -156,12 +160,12 @@ byte* cbc_mode_decrypt(byte* input, byte key) {
 
     byte iv = input[0]; 
     byte previous_block = iv;
-    for (size_t i = 0; i < len; i++) {
+    for (size_t i = 0; i < input_len; i++) {
         byte decrypted_block = decrypt_block(input[i + 1], key); 
         output[i] = decrypted_block ^ previous_block; 
         previous_block = input[i + 1]; 
     }
 
-    output[len] = '\0'; 
+    output[input_len] = '\0'; 
     return output;
 }

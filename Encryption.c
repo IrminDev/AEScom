@@ -53,18 +53,22 @@ byte* base64_decode(const char *data, size_t *output_length) {
     if (decoded_data == NULL) return NULL;
     
     size_t i, j = 0;
-    uint32_t sextet_a, sextet_b, sextet_c, sextet_d;
-    uint32_t triple;
     
     for (i = 0; i < input_length; i += 4) {
-        // Get values for each group of four base 64 characters
-        sextet_a = data[i] == '=' ? 0 & i+0 : base64_char_value(data[i+0]);
-        sextet_b = data[i+1] == '=' ? 0 & i+1 : base64_char_value(data[i+1]);
-        sextet_c = data[i+2] == '=' ? 0 & i+2 : base64_char_value(data[i+2]);
-        sextet_d = data[i+3] == '=' ? 0 & i+3 : base64_char_value(data[i+3]);
+        uint32_t sextet_a, sextet_b, sextet_c, sextet_d;
+        uint32_t triple;
         
-        // Check for invalid characters
-        if (sextet_a == -1 || sextet_b == -1 || sextet_c == -1 || sextet_d == -1) {
+        // Handle each character, treating '=' as 0
+        sextet_a = (i < input_length && data[i] != '=') ? base64_char_value(data[i]) : 0;
+        sextet_b = (i+1 < input_length && data[i+1] != '=') ? base64_char_value(data[i+1]) : 0;
+        sextet_c = (i+2 < input_length && data[i+2] != '=') ? base64_char_value(data[i+2]) : 0;
+        sextet_d = (i+3 < input_length && data[i+3] != '=') ? base64_char_value(data[i+3]) : 0;
+        
+        // Check for invalid characters (excluding padding)
+        if ((i < input_length && data[i] != '=' && sextet_a == -1) ||
+            (i+1 < input_length && data[i+1] != '=' && sextet_b == -1) ||
+            (i+2 < input_length && data[i+2] != '=' && sextet_c == -1) ||
+            (i+3 < input_length && data[i+3] != '=' && sextet_d == -1)) {
             free(decoded_data);
             *output_length = 0;
             return NULL;
@@ -72,6 +76,7 @@ byte* base64_decode(const char *data, size_t *output_length) {
         
         triple = (sextet_a << 18) + (sextet_b << 12) + (sextet_c << 6) + sextet_d;
         
+        // Output the bytes, but only up to the calculated output length
         if (j < *output_length) decoded_data[j++] = (triple >> 16) & 0xFF;
         if (j < *output_length) decoded_data[j++] = (triple >> 8) & 0xFF;
         if (j < *output_length) decoded_data[j++] = triple & 0xFF;
@@ -114,16 +119,11 @@ char* base64_encode(const unsigned char *data, size_t input_length) {
 }
 
 byte* encrypt_data(byte* input, byte key, char* mode) {
-    byte* output = (byte*)malloc(strlen((char*)input) + 1);
-    if (output == NULL) {
-        fprintf(stderr, "Memory allocation failed\n");
-        return NULL;
-    }
-    
+    byte* output = NULL;
     if(strcmp(mode, "ECB") == 0) {
         output = ebc_mode_encrypt(input, key);
     } else if(strcmp(mode, "CBC") == 0) {
-       byte iv; 
+        byte iv; 
         output = cbc_mode_encrypt(input, key, &iv);
     } else if(strcmp(mode, "CTR") == 0) {
         output = counter_mode_encrypt(input, key);
@@ -136,20 +136,15 @@ byte* encrypt_data(byte* input, byte key, char* mode) {
     return output;
 }
 
-byte* decrypt_data(byte* input, byte key, char* mode) {
-    byte* output = (byte*)malloc(strlen((char*)input) + 1);
-    if (output == NULL) {
-        fprintf(stderr, "Memory allocation failed\n");
-        return NULL;
-    }
+byte* decrypt_data(byte* input, byte key, char* mode, size_t length) {
+    byte* output = NULL;
     
     if(strcmp(mode, "ECB") == 0) {
-        output = ebc_mode_decrypt(input, key);
+        output = ebc_mode_decrypt(input, key, length);
     } else if(strcmp(mode, "CBC") == 0) {
-        output = cbc_mode_decrypt(input, key);
-
+        output = cbc_mode_decrypt(input, key, length);
     } else if(strcmp(mode, "CTR") == 0) {
-        output = counter_mode_decrypt(input, key);
+        output = counter_mode_decrypt(input, key, length);
     } else {
         fprintf(stderr, "Unsupported mode: %s\n", mode);
         free(output);
@@ -212,21 +207,15 @@ int main(int argc, char *argv[]) {
             decoded_input[decoded_length] = '\0';
         }
 
-        printf("Decoded input: ");
-        for (size_t i = 0; i < decoded_length; i++) {
-            printf("%02x ", decoded_input[i]);
-        }
-        printf("\n");
-
         // Decrypt the input data
-        byte* decrypted = decrypt_data(decoded_input, key, mode);
+        byte* decrypted = decrypt_data(decoded_input, key, mode, decoded_length);
         if (!decrypted) {
             fprintf(stderr, "Decryption failed\n");
             free(input);
             free(decoded_input);
             return 1;
         }
-
+        
         printf("Input: %s\n", input);
         printf("Decrypted: %s\n", decrypted);
 
@@ -256,12 +245,6 @@ int main(int argc, char *argv[]) {
         char* b64 = base64_encode(encrypted, encrypted_len);
         printf("%s", b64);
         free(b64);
-        printf("\n");
-
-        printf("Hex: ");
-        for(int i = 0; i < encrypted_len; i++) {
-            printf("%02x ", encrypted[i]);
-        }
         printf("\n");
     }
 }

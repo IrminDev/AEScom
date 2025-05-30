@@ -47,7 +47,6 @@ byte* counter_mode_encrypt(byte* input, byte key){
 
     output[strlen((char*)input)] = cnt;
 
-    printf("Counter value: %d\n", cnt);
     output[strlen((char*)input) + 1] = '\0';
 
     return output;
@@ -58,18 +57,13 @@ byte* counter_mode_decrypt(byte* input, byte key, size_t input_len) {
         fprintf(stderr, "NULL input in counter_mode_decrypt\n");
         return NULL;
     }
-    
-    // Get the counter value from the last byte
     byte start_counter = input[input_len-1];
-    printf("Counter value: %d\n", start_counter);
-    
     byte* output = (byte*)malloc(input_len);
     if (output == NULL) {
         fprintf(stderr, "Memory allocation failed\n");
         return NULL;
     }
     
-    // Use the same starting counter as encryption
     byte counter = start_counter - (input_len - 1);
     for (size_t i = 0; i < input_len - 1; i++) {
         output[i] = counter_mode_encrypt_operation(input[i], counter, key);
@@ -94,24 +88,10 @@ byte* ebc_mode_encrypt(byte* input, byte key){
 
     output[input_len] = '\0'; // Null-terminate the string
 
-    // Don't use strlen() on binary data - use the known length
-    printf("Output length: %zu\n", input_len);
-    printf("Output (hex): ");
-    for (size_t i = 0; i < input_len; i++) {
-        printf("%02x ", output[i]);
-    }
-    printf("\n");
-
     return output;
 }
 
 byte* ebc_mode_decrypt(byte* input, byte key, size_t input_len) {
-    printf("Input length: %zu\n", input_len);
-    printf("Input (hex): ");
-    for (size_t i = 0; i < input_len; i++) {
-        printf("%02x ", input[i]);
-    }
-    
     byte* output = (byte*)malloc(input_len + 1);
     if (output == NULL) {
         fprintf(stderr, "Memory allocation failed\n");

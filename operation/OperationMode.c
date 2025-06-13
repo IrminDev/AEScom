@@ -132,7 +132,14 @@ byte* cbc_mode_encrypt(byte* input, byte key, byte* iv) {
 }
 
 byte* cbc_mode_decrypt(byte* input, byte key, size_t input_len) {
-    byte* output = (byte*)malloc(input_len + 1); 
+    if (input_len < 1) {
+        fprintf(stderr, "Invalid input length for CBC decrypt\n");
+        return NULL;
+    }
+    
+    // The actual data length is input_len - 1 (excluding IV)
+    size_t data_len = input_len - 1;
+    byte* output = (byte*)malloc(data_len + 1); 
     if (output == NULL) {
         fprintf(stderr, "Memory allocation failed\n");
         return NULL;
@@ -140,12 +147,14 @@ byte* cbc_mode_decrypt(byte* input, byte key, size_t input_len) {
 
     byte iv = input[0]; 
     byte previous_block = iv;
-    for (size_t i = 0; i < input_len; i++) {
+    
+    // Process only the encrypted data bytes (excluding IV)
+    for (size_t i = 0; i < data_len; i++) {
         byte decrypted_block = decrypt_block(input[i + 1], key); 
         output[i] = decrypted_block ^ previous_block; 
         previous_block = input[i + 1]; 
     }
 
-    output[input_len] = '\0'; 
+    output[data_len] = '\0';  // Null-terminate at the correct position
     return output;
 }

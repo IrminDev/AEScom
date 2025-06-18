@@ -18,6 +18,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include "operation/OperationMode.h"
+#include <time.h>
 
 typedef unsigned char byte;
 
@@ -154,10 +155,127 @@ byte* decrypt_data(byte* input, byte key, char* mode, size_t length) {
     return output;
 }
 
+byte* read_file(const char* filename, size_t* file_size) {
+    FILE* file = fopen(filename, "rb");
+    if (!file) {
+        fprintf(stderr, "Error: Cannot open file '%s'\n", filename);
+        return NULL;
+    }
+
+    fseek(file, 0, SEEK_END);
+    *file_size = ftell(file);
+    fseek(file, 0, SEEK_SET);
+
+    if (*file_size == 0) {
+        fprintf(stderr, "Error: File '%s' is empty\n", filename);
+        fclose(file);
+        return NULL;
+    }
+
+    byte* buffer = (byte*)malloc(*file_size);
+    if (!buffer) {
+        fprintf(stderr, "Error: Memory allocation failed for file '%s'\n", filename);
+        fclose(file);
+        return NULL;
+    }
+
+    // Read file content
+    size_t bytes_read = fread(buffer, 1, *file_size, file);
+    fclose(file);
+
+    if (bytes_read != *file_size) {
+        fprintf(stderr, "Error: Failed to read entire file '%s'\n", filename);
+        free(buffer);
+        return NULL;
+    }
+
+    return buffer;
+}
+
+int write_file(const char* filename, const byte* data, size_t data_size) {
+    FILE* file = fopen(filename, "wb");
+    if (!file) {
+        fprintf(stderr, "Error: Cannot create file '%s'\n", filename);
+        return 0;
+    }
+
+    size_t bytes_written = fwrite(data, 1, data_size, file);
+    fclose(file);
+
+    if (bytes_written != data_size) {
+        fprintf(stderr, "Error: Failed to write entire file '%s'\n", filename);
+        return 0;
+    }
+
+    return 1;
+}
+
+char* create_encrypted_filename(const char* input_filename) {
+    size_t len = strlen(input_filename);
+    char* output_filename = (char*)malloc(len + 5); // +4 for ".enc" +1 for null terminator
+    if (!output_filename) {
+        fprintf(stderr, "Error: Memory allocation failed for filename\n");
+        return NULL;
+    }
+    
+    strcpy(output_filename, input_filename);
+    strcat(output_filename, ".enc");
+    return output_filename;
+}
+
+char* remove_enc_extension(const char* input_filename) {
+    size_t len = strlen(input_filename);
+    
+    // Check if filename ends with .enc
+    if (len < 4 || strcmp(input_filename + len - 4, ".enc") != 0) {
+        fprintf(stderr, "Error: File '%s' does not have .enc extension\n", input_filename);
+        return NULL;
+    }
+    
+    char* output_filename = (char*)malloc(len - 3); // -4 for ".enc" +1 for null terminator
+    if (!output_filename) {
+        fprintf(stderr, "Error: Memory allocation failed for filename\n");
+        return NULL;
+    }
+    
+    strncpy(output_filename, input_filename, len - 4);
+    output_filename[len - 4] = '\0';
+    return output_filename;
+}
+
 int main(int argc, char *argv[]) {
+    // Check for key generation option first
+    if (argc == 2 && strcmp(argv[1], "-gk") == 0) {
+        // Generate random key
+        srand((unsigned int)time(NULL));
+        byte random_key = (byte)(rand() % 256);
+        
+        char* b64_key = base64_encode(&random_key, 1);
+        if (!b64_key) {
+            fprintf(stderr, "Failed to encode key to Base64\n");
+            return 1;
+        }
+        
+        printf("Generated random key: %s (0x%02X)\n", b64_key, random_key);
+        free(b64_key);
+        return 0;
+    }
+
     if (argc < 4) {
-        fprintf(stderr, "Usage: %s <operation> <input_string> <key> <mode>\n", argv[0]);
-        fprintf(stderr, "operation: -e or -d\n");
+        fprintf(stderr, "Usage: %s <operation> <input> <key> <mode>\n", argv[0]);
+        fprintf(stderr, "Operations:\n");
+        fprintf(stderr, "  -e  : Encrypt string\n");
+        fprintf(stderr, "  -d  : Decrypt string\n");
+        fprintf(stderr, "  -fe : Encrypt file\n");
+        fprintf(stderr, "  -fd : Decrypt file\n");
+        fprintf(stderr, "  -gk : Generate random Base64 key\n");
+        fprintf(stderr, "Modes: ECB, CBC, CTR\n");
+        fprintf(stderr, "Key format: Base64 encoded single byte (e.g., 'Kg==' for 0x2A)\n");
+        fprintf(stderr, "Examples:\n");
+        fprintf(stderr, "  %s -gk\n", argv[0]);
+        fprintf(stderr, "  %s -e \"Hello World\" Kg== ECB\n", argv[0]);
+        fprintf(stderr, "  %s -fe /path/to/file.txt Kg== ECB\n", argv[0]);
+        fprintf(stderr, "  %s -fd /path/to/file.txt.enc Kg== ECB\n", argv[0]);
         return 1;
     }
 
@@ -167,24 +285,38 @@ int main(int argc, char *argv[]) {
         operation_type = 0;
     } else if (strcmp(operation, "-d") == 0) {
         operation_type = 1;
+    } else if (strcmp(operation, "-fe") == 0) {
+        operation_type = 2;
+    } else if (strcmp(operation, "-fd") == 0) {
+        operation_type = 3;
     } else {
         fprintf(stderr, "Invalid operation: %s\n", operation);
         return 1;
     }
 
     // Get the input string directly without conversion
-    byte* input = (byte*)strdup(argv[2]);  // Make a copy to avoid modifying argv
+    byte* input = (byte*)strdup(argv[2]);
     if (!input) {
         fprintf(stderr, "Memory allocation failed\n");
         return 1;
     }
     
-    // Convert key from hex string to byte
-    byte key = (byte)strtol(argv[3], NULL, 16);
+    // Decode Base64 key
+    size_t key_length;
+    byte* decoded_key = base64_decode(argv[3], &key_length);
+    if (!decoded_key || key_length != 1) {
+        fprintf(stderr, "Invalid Base64 key. Key must be a single byte encoded in Base64.\n");
+        fprintf(stderr, "Example: Use 'Kg==' for key 0x2A\n");
+        free(input);
+        if (decoded_key) free(decoded_key);
+        return 1;
+    }
+    byte key = decoded_key[0];
+    free(decoded_key);
 
     char* mode = argv[4];
 
-    if(operation_type){
+    if(operation_type == 1){
         size_t decoded_length;
         byte* decoded_input = base64_decode((char*)input, &decoded_length);
         if (!decoded_input) {
@@ -193,9 +325,7 @@ int main(int argc, char *argv[]) {
             return 1;
         }
         
-        // Ensure the decoded data is properly null-terminated for CTR mode
         if (strcmp(mode, "CTR") == 0 || strcmp(mode, "CBC") == 0) {
-            // We need to add a null terminator after the counter byte
             byte* temp = realloc(decoded_input, decoded_length + 1);
             if (!temp) {
                 fprintf(stderr, "Memory reallocation failed\n");
@@ -207,7 +337,6 @@ int main(int argc, char *argv[]) {
             decoded_input[decoded_length] = '\0';
         }
 
-        // Decrypt the input data
         byte* decrypted = decrypt_data(decoded_input, key, mode, decoded_length);
         if (!decrypted) {
             fprintf(stderr, "Decryption failed\n");
@@ -221,10 +350,127 @@ int main(int argc, char *argv[]) {
 
         free(decoded_input);
         free(decrypted);
-
         return 0;
+
+    } else if(operation_type == 2) {
+        byte* file_data;
+        size_t file_size;
+        file_data = read_file((char*)input, &file_size);
+        if (!file_data) {
+            free(input);
+            return 1;
+        }
+
+        byte* encrypted = encrypt_data(file_data, key, mode);
+        if (!encrypted) {
+            fprintf(stderr, "Encryption failed\n");
+            free(file_data);
+            free(input);
+            return 1;
+        }
+
+        char* output_filename = create_encrypted_filename((char*)input);
+        if (!output_filename) {
+            free(file_data);
+            free(encrypted);
+            free(input);
+            return 1;
+        }
+
+        size_t encrypted_size = file_size;
+        if (strcmp(mode, "CTR") == 0 || strcmp(mode, "CBC") == 0) {
+            encrypted_size = file_size + 1;
+        }
+
+        char* b64Encode = base64_encode(encrypted, encrypted_size);
+        if (!b64Encode) {
+            fprintf(stderr, "Base64 encoding failed\n");
+            free(file_data);
+            free(encrypted);
+            free(output_filename);
+            free(input);
+            return 1;
+        }
+
+        if (!write_file(output_filename, (byte*)b64Encode, strlen(b64Encode))) {
+            fprintf(stderr, "Failed to write encrypted data to file '%s'\n", output_filename);
+            free(file_data);
+            free(encrypted);
+            free(output_filename);
+            free(b64Encode);
+            free(input);
+            return 1;
+        }
+
+        printf("File '%s' encrypted successfully to '%s'\n", input, output_filename);
+
+        free(file_data);
+        free(encrypted);
+        free(output_filename);
+        free(input);
+        free(b64Encode);
+        return 0;
+
+    } else if(operation_type == 3) {
+        char* output_filename = remove_enc_extension((char*)input);
+        if (!output_filename) {
+            free(input);
+            return 1;
+        }
+
+        size_t file_size;
+        byte* file_data = read_file((char*)input, &file_size);
+        if (!file_data) {
+            free(output_filename);
+            free(input);
+            return 1;
+        }
+
+        size_t decoded_length;
+        byte* decoded_input = base64_decode((char*)file_data, &decoded_length);
+        if (!decoded_input) {
+            fprintf(stderr, "Base64 decoding failed\n");
+            free(file_data);
+            free(output_filename);
+            free(input);
+            return 1;
+        }
+
+        byte* decrypted = decrypt_data(decoded_input, key, mode, decoded_length);
+        if (!decrypted) {
+            fprintf(stderr, "Decryption failed\n");
+            free(file_data);
+            free(decoded_input);
+            free(output_filename);
+            free(input);
+            return 1;
+        }
+
+        size_t decrypted_size = decoded_length;
+        if (strcmp(mode, "CTR") == 0 || strcmp(mode, "CBC") == 0) {
+            decrypted_size = decoded_length - 1;
+        }
+
+        if (!write_file(output_filename, decrypted, decrypted_size)) {
+            fprintf(stderr, "Failed to write decrypted data to file '%s'\n", output_filename);
+            free(file_data);
+            free(decoded_input);
+            free(decrypted);
+            free(output_filename);
+            free(input);
+            return 1;
+        }
+
+        printf("File '%s' decrypted successfully to '%s'\n", input, output_filename);
+        
+        free(file_data);
+        free(decoded_input);
+        free(decrypted);
+        free(output_filename);
+        free(input);
+        return 0;
+
     } else {
-        // In the encryption branch
         byte* encrypted = encrypt_data(input, key, mode);
         if (!encrypted) {
             fprintf(stderr, "Encryption failed\n");
@@ -235,9 +481,8 @@ int main(int argc, char *argv[]) {
         size_t input_len = strlen((char*)input);
         size_t encrypted_len = input_len;
 
-        // For CTR mode, we need to include the counter byte in the Base64 encoding
         if (strcmp(mode, "CTR") == 0 || strcmp(mode, "CBC") == 0) {
-            encrypted_len = input_len + 1; // Include counter byte
+            encrypted_len = input_len + 1;
         }
 
         printf("Input: %s\n", input);
@@ -246,5 +491,9 @@ int main(int argc, char *argv[]) {
         printf("%s", b64);
         free(b64);
         printf("\n");
+        
+        free(encrypted);
+        free(input);
+        return 0;
     }
 }
